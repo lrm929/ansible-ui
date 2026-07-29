@@ -61,6 +61,20 @@ cd ../backend && python run.py   # 后端直接托管 dist,访问 http://服务�
 
 建议配合 nginx/caddy 反向代理 + systemd/supervisor 守护进程。
 
+## 自动更新(服务器)
+
+在服务器上克隆仓库并配置 cron,即可实现「推送到 GitHub 后自动部署重启」:
+
+```bash
+git clone https://github.com/lrm929/ansible-ui.git /opt/ansible-ui-repo
+chmod +x /opt/ansible-ui-repo/scripts/auto_update.sh
+( crontab -l 2>/dev/null; echo "*/5 * * * * /opt/ansible-ui-repo/scripts/auto_update.sh" ) | crontab -
+```
+
+原理:`auto_update.sh` 每 5 分钟检查 `origin/main` 是否有新提交,有则拉取并执行 `install.sh` 完成部署与重启,日志在 `/var/log/ansible-ui-autoupdate.log`。
+
+> 前端 `dist` 已纳入 git,**本地提交前务必先 `cd frontend && npm run build`**,否则服务器拉到的是旧界面。
+
 ## 目录结构
 
 ```
