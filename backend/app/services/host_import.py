@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 
 from ..models import Host
 
@@ -84,6 +85,94 @@ def _parse_port(value) -> int:
     except (TypeError, ValueError):
         pass
     return 22
+
+
+# LoadGameData 资产接口:每条记录固定 18 列,记录间仅靠 | 相连
+_GAMEDATA_RECORD_COLS = 18
+_IP_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
+
+
+def parse_gamedata(text: str):
+    """解析 LoadGameData 资产接口的 | 分隔字段流,返回 (rows, errors)。
+
+    split("|") 后每 18 列切一条记录;第 3 列(index 2)= 服务器 IP -> hostname,
+    第 6 列(index 5)= 昵称 -> comment;group_name 取昵称前缀(去尾部数字再去
+    末尾 _/-,前缀为空则用昵称本身);port 默认 22。
+    """
+    rows = []
+    errors = []
+    parts = text.split("|")
+    # 整个字段流以 | 结尾时会多出一个空元素,剔掉(仅这一个,记录内的空列保留)
+    if len(parts) % _GAMEDATA_RECORD_COLS == 1 and not parts[-1].strip():
+        parts.pop()
+    if not parts:
+        return rows, errors
+    if len(parts) % _GAMEDATA_RECORD_COLS != 0:
+        errors.append(
+            "资产数据格式错误: 总列数 {} 不是 {} 的整数倍".format(
+                len(parts), _GAMEDATA_RECORD_COLS
+            )
+        )
+        return rows, errors
+    for i in range(0, len(parts), _GAMEDATA_RECORD_COLS):
+        record = parts[i : i + _GAMEDATA_RECORD_COLS]
+        rec_no = i // _GAMEDATA_RECORD_COLS + 1
+        ip = record[2].strip()
+        nickname = record[5].strip()
+        if not _IP_RE.match(ip):
+            errors.append("第{}条: IP 不合法: {}".format(rec_no, ip or "(空)"))
+            continue
+        rows.append(
+            {
+                "hostname": ip,
+                "port": 22,
+                "group_name": _nickname_prefix(nickname),
+                "vars": "",
+                "comment": nickname,
+            }
+        )
+    return rows, errors
+
+
+def _nickname_prefix(nickname: str) -> str:
+    """昵称前缀:去掉尾部数字,再去掉末尾的 _/-;前缀为空则用昵称本身。"""
+    prefix = re.sub(r"\d+$", "", nickname).rstrip("_-")
+    return prefix or nickname
+
+
+def parse_assets_txt(text: str):
+    """解析资产 TXT,返回 (rows, errors)。
+
+    每行 `昵称<分隔>IP<分隔>组名`;分隔符:行内含 Tab 按 Tab,否则含逗号按
+    逗号,否则按连续空白 split。映射 comment=昵称、hostname=IP、
+    group_name=组名,port 22。空行跳过,列数不足记 errors(带行号)。
+    """
+    rows = []
+    errors = []
+    for line_no, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        if "\t" in line:
+            cells = line.split("\t")
+        elif "," in line:
+            cells = line.split(",")
+        else:
+            cells = re.split(r"\s+", line.strip())
+        cells = [c.strip() for c in cells if c.strip()]
+        if len(cells) < 3:
+            errors.append("第{}行: 列数不足(需要: 昵称 IP 组名)".format(line_no))
+            continue
+        nickname, ip, group = cells[0], cells[1], cells[2]
+        rows.append(
+            {
+                "hostname": ip,
+                "port": 22,
+                "group_name": group,
+                "vars": "",
+                "comment": nickname,
+            }
+        )
+    return rows, errors
 
 
 def apply_exclude_rules(rows, exclude_rules: str):

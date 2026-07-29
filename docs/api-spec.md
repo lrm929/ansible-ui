@@ -63,11 +63,18 @@ Credential：
 ### POST /api/inventories/{id}/hosts → Host
 ### PUT /api/hosts/{id} → Host
 ### DELETE /api/hosts/{id}
-### POST /api/inventories/{id}/hosts/import  （multipart 上传 CSV 文件,字段名 file）
-解析 CSV 导入主机,按 (inventory_id, hostname) upsert。响应:`{"added": 3, "updated": 2, "errors": ["第5行: 主机名为空"]}`
-CSV 格式:支持带表头(`hostname,port,group_name,vars,comment`,列可缺省、顺序不限)或无表头(每行第一列为主机名,其余忽略)。编码自动识别 utf-8-sig / gbk。
+### POST /api/inventories/{id}/hosts/import  （multipart 上传文件,字段名 file）
+解析文件导入主机,按 (inventory_id, hostname) upsert。响应:`{"added": 3, "updated": 2, "excluded": 1, "errors": ["第5行: 主机名为空"]}`
+支持的文件格式(按扩展名/内容自动识别):
+- **CSV**:支持带表头(`hostname,port,group_name,vars,comment`,列可缺省、顺序不限)或无表头(每行第一列为主机名,其余忽略)。编码自动识别 utf-8-sig / gbk。
+- **资产 TXT(.txt)**:每行 `昵称<分隔>IP<分隔>组名`,分隔符支持 Tab / 逗号 / 连续空白。映射:IP→hostname、组名→group_name、昵称→comment。
 ### POST /api/inventories/{id}/sync  （从 source_url 拉取主机列表）
-要求清单已配置 source_url(未配置返回 400)。GET 该 URL,内容支持 JSON 数组(`[{"hostname": "...", "port": 22, ...}]`)或 CSV(规则同上传)。upsert 入库,更新清单 sync_status/sync_message/last_sync_at。响应同 import。
+要求清单已配置 source_url(未配置返回 400)。GET 该 URL,按内容自动识别格式:
+- JSON 数组(`[{"hostname": "...", "port": 22, ...}]`)
+- CSV(规则同上传)
+- **LoadGameData 资产接口**:无换行的 `|` 分隔字段流,每条记录固定 18 列(末两列为空),取第 3 列为服务器 IP(hostname)、第 6 列为昵称(comment);分组取昵称前缀——去掉昵称尾部数字再去掉末尾的 `_`/`-` 即为前缀,前缀相同的机器归为一组(group_name)。
+
+upsert 入库,更新清单 sync_status/sync_message/last_sync_at。响应同 import。
 
 Inventory：`{"id": 1, "name": "生产环境", "description": "...", "host_count": 5, "created_at": "...", "source_url": null, "last_sync_at": null, "sync_status": "never|ok|error", "sync_message": ""}`
 

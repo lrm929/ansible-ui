@@ -129,14 +129,14 @@
           <el-upload
             :auto-upload="false"
             :limit="1"
-            accept=".csv,text/csv"
+            accept=".csv,.txt,text/csv,text/plain"
             :on-change="onCsvSelected"
             :on-remove="onCsvRemoved"
             class="csv-select"
           >
             <el-button size="small" :icon="Upload">选择文件</el-button>
             <template #tip>
-              <div class="upload-tip">保存清单后自动导入,支持带表头或无表头 CSV</div>
+              <div class="upload-tip">保存清单后自动导入;支持 CSV(带表头)或资产 TXT(每行:昵称 IP 组名)</div>
             </template>
           </el-upload>
         </el-form-item>

@@ -215,7 +215,10 @@ def import_hosts(
     inv = _get_inventory(db, inv_id)
     data = file.file.read()
     text = host_import.decode_csv_bytes(data)
-    rows, errors = host_import.parse_csv(text)
+    if (file.filename or "").lower().endswith(".txt"):
+        rows, errors = host_import.parse_assets_txt(text)
+    else:
+        rows, errors = host_import.parse_csv(text)
     if not rows and not errors:
         raise HTTPException(status_code=400, detail="CSV 内容为空或无法解析")
     rows, excluded = host_import.apply_exclude_rules(rows, inv.exclude_rules)
@@ -267,7 +270,7 @@ def _sync_failed(db: Session, inv: Inventory, message: str):
 
 
 def _parse_sync_body(body: bytes, content_type: str):
-    """按 Content-Type 或内容首字符判断 JSON([ 开头)还是 CSV。"""
+    """识别顺序:lstrip 后 [ 开头 -> JSON;含 | -> LoadGameData 资产接口;否则 CSV。"""
     text = host_import.decode_csv_bytes(body)
     stripped = text.lstrip()
     if "json" in content_type.lower() or stripped.startswith("["):
@@ -294,4 +297,6 @@ def _parse_sync_body(body: bytes, content_type: str):
                 }
             )
         return rows, errors
+    if "|" in text:
+        return host_import.parse_gamedata(text)
     return host_import.parse_csv(text)
