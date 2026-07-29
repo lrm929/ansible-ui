@@ -3,7 +3,7 @@
     <el-card shadow="never" class="page-card">
       <div class="toolbar">
         <span class="title">项目</span>
-        <el-button type="primary" :icon="Plus" @click="openDialog()">新增项目</el-button>
+        <el-button v-if="!isViewer" type="primary" :icon="Plus" @click="openDialog()">新增项目</el-button>
       </div>
       <el-table v-loading="loading" :data="projects" stripe>
         <el-table-column prop="id" label="ID" width="70" />
@@ -33,7 +33,7 @@
         <el-table-column label="最近同步" width="170">
           <template #default="{ row }">{{ formatTime(row.last_sync_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column v-if="!isViewer" label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button
               text
@@ -84,11 +84,15 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '../api'
 import { formatTime, syncStatus } from '../utils/format'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const isViewer = computed(() => authStore.user?.role === 'viewer')
 
 const loading = ref(false)
 const projects = ref([])

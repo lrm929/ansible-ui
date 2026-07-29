@@ -3,7 +3,7 @@
     <el-card shadow="never" class="page-card">
       <div class="toolbar">
         <span class="title">凭据</span>
-        <el-button type="primary" :icon="Plus" @click="openDialog()">新增凭据</el-button>
+        <el-button v-if="!isViewer" type="primary" :icon="Plus" @click="openDialog()">新增凭据</el-button>
       </div>
       <el-table v-loading="loading" :data="credentials" stripe>
         <el-table-column prop="id" label="ID" width="70" />
@@ -24,7 +24,7 @@
         <el-table-column label="创建时间" width="170">
           <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column v-if="!isViewer" label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" size="small" @click="openDialog(row)">编辑</el-button>
             <el-button text type="danger" size="small" @click="remove(row)">删除</el-button>
@@ -77,11 +77,15 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '../api'
 import { formatTime } from '../utils/format'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const isViewer = computed(() => authStore.user?.role === 'viewer')
 
 const loading = ref(false)
 const credentials = ref([])

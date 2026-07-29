@@ -41,6 +41,14 @@
           <el-icon><AlarmClock /></el-icon>
           <span>定时任务</span>
         </el-menu-item>
+        <el-menu-item index="/playbooks">
+          <el-icon><Document /></el-icon>
+          <span>Playbook</span>
+        </el-menu-item>
+        <el-menu-item v-if="auth.user?.role === 'admin'" index="/users">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon><Bell /></el-icon>
           <span>通知设置</span>

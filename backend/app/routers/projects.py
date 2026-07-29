@@ -10,7 +10,13 @@ from ..config import REPOS_DIR
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import Project, User
-from ..schemas import PlaybooksResponse, ProjectCreate, ProjectOut, ProjectUpdate
+from ..schemas import (
+    PlaybookFile,
+    PlaybooksResponse,
+    ProjectCreate,
+    ProjectOut,
+    ProjectUpdate,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["项目"])
 
@@ -165,3 +171,88 @@ def list_playbooks(
                     playbooks.append(rel)
     playbooks.sort()
     return {"playbooks": playbooks}
+
+
+# ---------- Playbook 文件内容管理 ----------
+
+
+def _playbook_abs(project: Project, rel_path: str) -> str:
+    """相对路径 -> 绝对路径,防目录穿越。"""
+    base = os.path.normpath(_project_dir(project))
+    full = os.path.normpath(os.path.join(base, rel_path))
+    if full != base and not full.startswith(base + os.sep):
+        raise HTTPException(status_code=400, detail="路径不合法: 不能越出项目目录")
+    return full
+
+
+def _require_local(project: Project):
+    if project.source_type != "local":
+        raise HTTPException(status_code=400, detail="Git 项目请在仓库中修改")
+
+
+@router.get("/{project_id}/playbooks/{path:path}", response_model=PlaybookFile)
+def read_playbook(
+    project_id: int,
+    path: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = _get_project(db, project_id)
+    full = _playbook_abs(project, path)
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail="文件不存在: {}".format(path))
+    with open(full, "r", encoding="utf-8") as f:
+        content = f.read()
+    return PlaybookFile(path=path, content=content)
+
+
+@router.post("/{project_id}/playbooks", response_model=PlaybookFile)
+def create_playbook(
+    project_id: int,
+    payload: PlaybookFile,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = _get_project(db, project_id)
+    _require_local(project)
+    full = _playbook_abs(project, payload.path)
+    if os.path.exists(full):
+        raise HTTPException(status_code=409, detail="文件已存在: {}".format(payload.path))
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "w", encoding="utf-8", newline="\n") as f:
+        f.write(payload.content)
+    return PlaybookFile(path=payload.path, content=payload.content)
+
+
+@router.put("/{project_id}/playbooks/{path:path}", response_model=PlaybookFile)
+def update_playbook(
+    project_id: int,
+    path: str,
+    payload: PlaybookFile,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = _get_project(db, project_id)
+    _require_local(project)
+    full = _playbook_abs(project, path)
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail="文件不存在: {}".format(path))
+    with open(full, "w", encoding="utf-8", newline="\n") as f:
+        f.write(payload.content)
+    return PlaybookFile(path=path, content=payload.content)
+
+
+@router.delete("/{project_id}/playbooks/{path:path}")
+def delete_playbook(
+    project_id: int,
+    path: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    project = _get_project(db, project_id)
+    _require_local(project)
+    full = _playbook_abs(project, path)
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail="文件不存在: {}".format(path))
+    os.remove(full)
+    return {"detail": "已删除"}

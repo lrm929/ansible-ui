@@ -3,7 +3,7 @@
     <el-card shadow="never" class="page-card">
       <div class="toolbar">
         <span class="title">任务模板</span>
-        <el-button type="primary" :icon="Plus" @click="openDialog()">新增模板</el-button>
+        <el-button v-if="!isViewer" type="primary" :icon="Plus" @click="openDialog()">新增模板</el-button>
       </div>
       <el-table v-loading="loading" :data="templates" stripe>
         <el-table-column prop="id" label="ID" width="70" />
@@ -12,7 +12,7 @@
         <el-table-column prop="playbook" label="Playbook" min-width="150" show-overflow-tooltip />
         <el-table-column prop="inventory_name" label="清单" width="110" show-overflow-tooltip />
         <el-table-column prop="credential_name" label="凭据" width="130" show-overflow-tooltip />
-        <el-table-column label="操作" width="210" fixed="right">
+        <el-table-column v-if="!isViewer" label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-button text type="success" size="small" :loading="runningId === row.id" @click="run(row)">
               运行
@@ -81,11 +81,15 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const isViewer = computed(() => authStore.user?.role === 'viewer')
 
 const router = useRouter()
 

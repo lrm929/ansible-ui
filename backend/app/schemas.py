@@ -16,6 +16,18 @@ class UserOut(BaseModel):
     id: int
     username: str
     role: str
+    created_at: Optional[datetime] = None
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "operator"  # admin | operator | viewer
+
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    password: Optional[str] = None  # 不传表示不重置
 
 
 class LoginResponse(BaseModel):
@@ -173,6 +185,11 @@ class ProjectOut(BaseModel):
 
 class PlaybooksResponse(BaseModel):
     playbooks: list
+
+
+class PlaybookFile(BaseModel):
+    path: str
+    content: str = ""
 
 
 # ---------- 模板 ----------

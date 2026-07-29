@@ -12,6 +12,8 @@
 - ▶️ 任务执行:WebSocket 实时日志、停止任务、完整历史记录
 - ⏰ 定时任务:标准 cron 表达式调度模板执行
 - 📢 通知:企业微信 webhook 任务结果通知
+- 📝 Playbook 管理:在线新建/查看/编辑本地项目的 playbook 文件(Git 项目只读)
+- 👥 多用户与权限:管理员/操作员/只读三级角色
 - 👤 用户:登录认证、修改密码
 
 ## 技术栈
@@ -86,7 +88,6 @@ chmod +x /opt/ansible-ui-repo/scripts/auto_update.sh
 
 ## 路线图
 
-- [ ] 多用户与角色权限(管理员/操作员/只读)
 - [ ] Ansible Galaxy role 安装支持
 - [ ] 任务执行前的 dry-run(--check)模式
 - [ ] Docker 一键部署

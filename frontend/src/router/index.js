@@ -61,6 +61,18 @@ const routes = [
         meta: { title: '定时任务' }
       },
       {
+        path: 'playbooks',
+        name: 'Playbooks',
+        component: () => import('../views/Playbooks.vue'),
+        meta: { title: 'Playbook' }
+      },
+      {
+        path: 'users',
+        name: 'Users',
+        component: () => import('../views/Users.vue'),
+        meta: { title: '用户管理', adminOnly: true }
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/Settings.vue'),
@@ -79,7 +91,7 @@ const router = createRouter({
   routes
 })
 
-// 登录守卫:无 token 一律跳登录页
+// 登录守卫:无 token 一律跳登录页;adminOnly 页面非 admin 跳回首页
 router.beforeEach((to) => {
   const token = localStorage.getItem('token')
   if (!to.meta.public && !token) {
@@ -87,6 +99,12 @@ router.beforeEach((to) => {
   }
   if (to.path === '/login' && token) {
     return { path: '/' }
+  }
+  if (to.meta.adminOnly) {
+    const user = JSON.parse(localStorage.getItem('user') || 'null')
+    if (user?.role !== 'admin') {
+      return { path: '/' }
+    }
   }
   return true
 })

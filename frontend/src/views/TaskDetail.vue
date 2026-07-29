@@ -7,7 +7,7 @@
         <div>
           <el-button :icon="Refresh" circle title="刷新" @click="loadTask" />
           <el-button
-            v-if="isRunning"
+            v-if="isRunning && !isViewer"
             type="danger"
             :loading="stopping"
             @click="stopTask"
@@ -49,6 +49,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import api from '../api'
 import { formatTime, formatDuration, taskStatus, stripAnsi } from '../utils/format'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const isViewer = computed(() => authStore.user?.role === 'viewer')
 
 const route = useRoute()
 const id = route.params.id

@@ -28,8 +28,8 @@
           <el-switch v-model="form.notify_on_failure" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="saving" @click="save">保存</el-button>
-          <el-button :loading="testing" @click="sendTest">发送测试消息</el-button>
+          <el-button v-if="!isViewer" type="primary" :loading="saving" @click="save">保存</el-button>
+          <el-button v-if="!isViewer" :loading="testing" @click="sendTest">发送测试消息</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -40,6 +40,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const isViewer = computed(() => authStore.user?.role === 'viewer')
 
 const loading = ref(false)
 const saving = ref(false)

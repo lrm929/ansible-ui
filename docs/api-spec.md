@@ -206,6 +206,28 @@ WebhookConfig：
 
 通知触发时机：任务执行结束（success / failed / stopped）后，若 enabled 且对应状态开关打开，向 webhook_url POST 企业微信 markdown 消息。通知发送失败只记录日志，不影响任务状态。
 
+## 用户与权限
+
+角色:`admin`(全部权限 + 用户管理)/ `operator`(除用户管理外的全部操作)/ `viewer`(只读,仅 GET)。
+全局规则(中间件实现):非 GET 的 `/api/*` 请求,viewer 一律 403;`/api/users*` 仅 admin。
+种子的 admin 用户角色为 admin。
+
+### GET /api/users → User[]           （仅 admin）
+### POST /api/users → User            （仅 admin）`{"username": "...", "password": "...", "role": "operator"}`
+### PUT /api/users/{id} → User        （仅 admin）`{"role": "viewer", "password": "..."}` 均可选,改角色/重置密码
+### DELETE /api/users/{id}            （仅 admin）不能删除自己,不能删除最后一个 admin
+
+User:`{"id": 2, "username": "ops", "role": "operator", "created_at": "..."}`
+
+## Playbook 文件管理
+
+仅 `source_type=local` 的项目支持写操作(git 项目只读,写接口返回 400)。path 为项目内相对路径,必须以防目录穿越(`..` 拒绝 400)。
+
+### GET /api/projects/{id}/playbooks/{path} → `{"path": "site.yml", "content": "..."}`
+### POST /api/projects/{id}/playbooks → 同对象;已存在返回 409;自动创建子目录
+### PUT /api/projects/{id}/playbooks/{path} → `{"path": "...", "content": "..."}`
+### DELETE /api/projects/{id}/playbooks/{path} → `{"detail": "已删除"}`
+
 ## 约定补充
 
 - 时间格式 ISO 8601 字符串，后端存 UTC，前端本地格式化显示。

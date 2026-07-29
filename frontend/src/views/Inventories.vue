@@ -6,7 +6,7 @@
         <el-card shadow="never" class="page-card">
           <div class="toolbar">
             <span class="title">清单</span>
-            <el-button type="primary" size="small" :icon="Plus" @click="openInvDialog()">新增清单</el-button>
+            <el-button v-if="!isViewer" type="primary" size="small" :icon="Plus" @click="openInvDialog()">新增清单</el-button>
           </div>
           <el-table
             v-loading="invLoading"
@@ -35,10 +35,22 @@
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="110" fixed="right">
+            <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
-                <el-button text type="primary" size="small" @click.stop="openInvDialog(row)">编辑</el-button>
-                <el-button text type="danger" size="small" @click.stop="deleteInv(row)">删除</el-button>
+                <el-button
+                  v-if="row.source_url && !isViewer"
+                  text
+                  type="success"
+                  size="small"
+                  :loading="syncingId === row.id"
+                  @click.stop="syncInv(row)"
+                >
+                  同步
+                </el-button>
+                <template v-if="!isViewer">
+                  <el-button text type="primary" size="small" @click.stop="openInvDialog(row)">编辑</el-button>
+                  <el-button text type="danger" size="small" @click.stop="deleteInv(row)">删除</el-button>
+                </template>
               </template>
             </el-table-column>
             <template #empty>暂无清单,请先新增</template>
@@ -46,66 +58,100 @@
         </el-card>
       </el-col>
 
-      <!-- 右侧:当前清单的主机 -->
+      <!-- 右侧:清单概要 -->
       <el-col :span="16">
-        <el-card shadow="never" class="page-card">
+        <el-card shadow="never" class="page-card" v-loading="hostLoading">
           <div class="toolbar">
             <span class="title">
-              主机{{ currentInv ? ` - ${currentInv.name}` : '' }}
+              清单概要{{ currentInv ? ` - ${currentInv.name}` : '' }}
               <span v-if="currentInv?.description" class="inv-desc">{{ currentInv.description }}</span>
             </span>
-            <div class="host-actions">
-              <el-upload
-                :show-file-list="false"
-                accept=".csv,text/csv"
-                :http-request="uploadCsv"
-                class="csv-upload"
-              >
-                <el-button size="small" :icon="Upload" :disabled="!currentInv">上传 CSV</el-button>
-              </el-upload>
-              <el-button
-                size="small"
-                :icon="Refresh"
-                :disabled="!currentInv?.source_url"
-                :loading="syncing"
-                @click="syncInv"
-              >
-                同步
-              </el-button>
-              <el-button
-                type="primary"
-                size="small"
-                :icon="Plus"
-                :disabled="!currentInv"
-                @click="openHostDialog()"
-              >
-                新增主机
-              </el-button>
-            </div>
+            <el-button size="small" :disabled="!currentInv" @click="drawerVisible = true">查看主机</el-button>
           </div>
-          <el-table v-loading="hostLoading" :data="hosts" stripe>
-            <el-table-column prop="hostname" label="主机地址" min-width="140" show-overflow-tooltip />
-            <el-table-column prop="port" label="端口" width="70" />
-            <el-table-column prop="group_name" label="分组" width="100">
-              <template #default="{ row }">{{ row.group_name || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="vars" label="变量" min-width="130" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.vars || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="comment" label="备注" min-width="120" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.comment || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="110" fixed="right">
-              <template #default="{ row }">
-                <el-button text type="primary" size="small" @click="openHostDialog(row)">编辑</el-button>
-                <el-button text type="danger" size="small" @click="deleteHost(row)">删除</el-button>
+          <template v-if="currentInv">
+            <div class="summary-block">
+              <div class="summary-item">
+                <div class="summary-num">{{ summary.total }}</div>
+                <div class="summary-label">主机总数</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-num">{{ summary.groupList.length }}</div>
+                <div class="summary-label">分组数量</div>
+              </div>
+            </div>
+            <el-divider />
+            <div class="summary-section">
+              <div class="summary-title">分组分布</div>
+              <template v-if="summary.groupList.length">
+                <el-tag v-for="g in summary.groupList" :key="g.name" class="group-tag">
+                  {{ g.name }} ({{ g.count }} 台)
+                </el-tag>
               </template>
-            </el-table-column>
-            <template #empty>{{ currentInv ? '该清单下暂无主机' : '请先选择左侧清单' }}</template>
-          </el-table>
+              <span v-else class="empty-text">暂无主机</span>
+            </div>
+            <div class="summary-section">
+              <div class="summary-title">端口分布</div>
+              <template v-if="summary.portList.length">
+                <el-tag v-for="p in summary.portList" :key="p.port" type="info" class="group-tag">
+                  {{ p.port }}×{{ p.count }}
+                </el-tag>
+              </template>
+              <span v-else class="empty-text">-</span>
+            </div>
+            <div class="summary-section">
+              <div class="summary-title">最近备注</div>
+              <template v-if="summary.comments.length">
+                <div v-for="(c, i) in summary.comments" :key="i" class="comment-line">
+                  <span class="comment-host">{{ c.hostname }}</span>{{ c.comment }}
+                </div>
+              </template>
+              <span v-else class="empty-text">-</span>
+            </div>
+          </template>
+          <el-empty v-else description="请先选择左侧清单" :image-size="80" />
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 主机列表抽屉 -->
+    <el-drawer
+      v-model="drawerVisible"
+      :title="`主机列表${currentInv ? ' - ' + currentInv.name : ''}`"
+      size="60%"
+    >
+      <div class="drawer-toolbar">
+        <el-button
+          v-if="!isViewer"
+          type="primary"
+          size="small"
+          :icon="Plus"
+          :disabled="!currentInv"
+          @click="openHostDialog()"
+        >
+          新增主机
+        </el-button>
+      </div>
+      <el-table v-loading="hostLoading" :data="hosts" stripe>
+        <el-table-column prop="hostname" label="主机地址" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="port" label="端口" width="70" />
+        <el-table-column prop="group_name" label="分组" width="100">
+          <template #default="{ row }">{{ row.group_name || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="vars" label="变量" min-width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.vars || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="comment" label="备注" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.comment || '-' }}</template>
+        </el-table-column>
+        <el-table-column v-if="!isViewer" label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button text type="primary" size="small" @click="openHostDialog(row)">编辑</el-button>
+            <el-button text type="danger" size="small" @click="deleteHost(row)">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>该清单下暂无主机</template>
+      </el-table>
+    </el-drawer>
 
     <!-- 清单新增/编辑对话框 -->
     <el-dialog v-model="invDialogVisible" :title="invForm.id ? '编辑清单' : '新增清单'" width="560px" :close-on-click-modal="false">
@@ -204,9 +250,13 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Upload } from '@element-plus/icons-vue'
+import { Plus, Upload } from '@element-plus/icons-vue'
 import api from '../api'
 import { formatTime } from '../utils/format'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const isViewer = computed(() => authStore.user?.role === 'viewer')
 
 const inventories = ref([])
 const hosts = ref([])
@@ -214,7 +264,28 @@ const credentials = ref([])
 const currentInv = ref(null)
 const invLoading = ref(false)
 const hostLoading = ref(false)
-const syncing = ref(false)
+const syncingId = ref(null)
+const drawerVisible = ref(false)
+
+// 概要聚合(前端从 hosts 计算,不加后端接口)
+const summary = computed(() => {
+  const list = hosts.value
+  const groups = {}
+  const ports = {}
+  for (const h of list) {
+    const g = h.group_name || '(未分组)'
+    groups[g] = (groups[g] || 0) + 1
+    ports[h.port] = (ports[h.port] || 0) + 1
+  }
+  const groupList = Object.entries(groups)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+  const portList = Object.entries(ports)
+    .map(([port, count]) => ({ port, count }))
+    .sort((a, b) => b.count - a.count)
+  const comments = list.filter((h) => h.comment).slice(-5).reverse()
+  return { total: list.length, groupList, portList, comments }
+})
 
 // 清单对话框
 const invDialogVisible = ref(false)
@@ -472,34 +543,19 @@ async function deleteHost(row) {
   }
 }
 
-async function uploadCsv({ file }) {
-  if (!currentInv.value) return
-  const fd = new FormData()
-  fd.append('file', file)
+async function syncInv(row) {
+  if (!row?.source_url) return
+  syncingId.value = row.id
   try {
-    const { data } = await api.post(`/inventories/${currentInv.value.id}/hosts/import`, fd)
+    const { data } = await api.post(`/inventories/${row.id}/sync`)
     showImportResult(data)
-    await loadHosts()
-    await loadInventories()
   } catch {
     // 错误提示由拦截器统一处理
-  }
-}
-
-async function syncInv() {
-  if (!currentInv.value?.source_url) return
-  syncing.value = true
-  try {
-    const { data } = await api.post(`/inventories/${currentInv.value.id}/sync`)
-    showImportResult(data)
-    await loadHosts()
-    await loadInventories()
-  } catch {
-    // 错误提示由拦截器统一处理;同步状态刷新出来
-    await loadInventories()
   } finally {
-    syncing.value = false
+    syncingId.value = null
   }
+  // 同步完成刷新概要,保证每次同步后都是最新数据
+  await loadInventories()
 }
 
 function showImportResult(data) {
@@ -545,16 +601,6 @@ onMounted(async () => {
   margin-left: 8px;
 }
 
-.host-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.csv-upload {
-  display: inline-block;
-}
-
 .sync-time {
   font-size: 12px;
   color: #909399;
@@ -583,5 +629,64 @@ onMounted(async () => {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
+}
+
+.summary-block {
+  display: flex;
+  gap: 48px;
+  padding: 8px 0;
+}
+
+.summary-item {
+  text-align: center;
+}
+
+.summary-num {
+  font-size: 28px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.summary-section {
+  margin-bottom: 16px;
+}
+
+.summary-title {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.group-tag {
+  margin-right: 8px;
+  margin-bottom: 6px;
+}
+
+.empty-text {
+  color: #c0c4cc;
+  font-size: 13px;
+}
+
+.comment-line {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.9;
+}
+
+.comment-host {
+  color: #909399;
+  margin-right: 8px;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.drawer-toolbar {
+  margin-bottom: 12px;
 }
 </style>

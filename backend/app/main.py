@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 
 from fastapi import FastAPI
@@ -19,8 +20,9 @@ from .routers import (
     settings,
     tasks,
     templates,
+    users,
 )
-from .security import hash_password
+from .security import decode_token, hash_password
 from .services import scheduler as scheduler_service
 from .services.ws_manager import ws_manager
 
@@ -34,7 +36,70 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, dashboard, credentials, inventories, projects, templates, tasks, schedules, settings):
+
+class PermissionMiddleware:
+    """全局权限:非 GET 的 /api/* 请求,viewer 一律 403;/api/users* 仅 admin。
+
+    无效/缺失 token 不在此拦截(交给各路由的 get_current_user 返回 401);
+    /api/auth/login、/api/auth/password(任何人可改自己的密码)与 WebSocket /api/ws 不受影响。
+    """
+
+    EXEMPT_PATHS = ("/api/auth/login", "/api/auth/password")
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        method = scope.get("method", "GET")
+        if (
+            path.startswith("/api/")
+            and not path.startswith("/api/ws")
+            and method != "GET"
+            and path not in self.EXEMPT_PATHS
+        ):
+            role = _role_from_scope(scope)
+            if role == "viewer":
+                await _reject(send, 403, "只读用户无操作权限")
+                return
+            if path.startswith("/api/users") and role is not None and role != "admin":
+                await _reject(send, 403, "仅管理员可管理用户")
+                return
+        await self.app(scope, receive, send)
+
+
+def _role_from_scope(scope):
+    for key, value in scope.get("headers", []):
+        if key.lower() == b"authorization":
+            auth = value.decode("latin-1")
+            if auth.lower().startswith("bearer "):
+                payload = decode_token(auth[7:].strip())
+                if payload:
+                    return payload.get("role")
+    return None
+
+
+async def _reject(send, status: int, detail: str):
+    body = json.dumps({"detail": detail}, ensure_ascii=False).encode("utf-8")
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"content-type", b"application/json; charset=utf-8"),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
+app.add_middleware(PermissionMiddleware)
+
+for module in (auth, dashboard, credentials, inventories, projects, templates, tasks, schedules, settings, users):
     app.include_router(module.router)
 
 
