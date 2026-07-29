@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+websockets  # uvicorn 的 WebSocket 支持(/api/ws/tasks/{id} 需要)
+sqlalchemy>=2.0
+pyjwt
+cryptography
+apscheduler>=3.10,<4.0
+pydantic>=2.0
