@@ -37,9 +37,16 @@ class Inventory(Base):
     last_sync_at = Column(DateTime, nullable=True)
     sync_status = Column(String(16), default="never")  # never | ok | error
     sync_message = Column(Text, default="")
+    os_type = Column(String(16), default="linux")  # linux | windows
+    exclude_rules = Column(Text, default="")  # 每行一条,主机名/分组包含即排除
+    credential_id = Column(Integer, ForeignKey("credentials.id"), nullable=True)
+    default_username = Column(String(128), default="")
+    default_password_encrypted = Column(Text, nullable=True)  # Fernet 加密,永不回传
+    default_port = Column(Integer, nullable=True)  # 可空:linux 22 / windows 5985
     created_at = Column(DateTime, default=datetime.utcnow)
 
     hosts = relationship("Host", back_populates="inventory", cascade="all, delete-orphan")
+    credential = relationship("Credential")
 
 
 class Host(Base):

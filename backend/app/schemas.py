@@ -64,12 +64,24 @@ class InventoryCreate(BaseModel):
     name: str
     description: str = ""
     source_url: Optional[str] = None
+    os_type: str = "linux"  # linux | windows
+    exclude_rules: str = ""
+    credential_id: Optional[int] = None
+    default_username: str = ""
+    default_password: Optional[str] = None
+    default_port: Optional[int] = None
 
 
 class InventoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     source_url: Optional[str] = None
+    os_type: Optional[str] = None
+    exclude_rules: Optional[str] = None
+    credential_id: Optional[int] = None
+    default_username: Optional[str] = None
+    default_password: Optional[str] = None  # 不传/空表示不修改
+    default_port: Optional[int] = None
 
 
 class InventoryOut(BaseModel):
@@ -83,12 +95,20 @@ class InventoryOut(BaseModel):
     last_sync_at: Optional[datetime] = None
     sync_status: str = "never"
     sync_message: str = ""
+    os_type: str = "linux"
+    exclude_rules: str = ""
+    credential_id: Optional[int] = None
+    credential_name: Optional[str] = None
+    default_username: str = ""
+    has_default_password: bool = False
+    default_port: Optional[int] = None
     created_at: datetime
 
 
 class HostImportResult(BaseModel):
     added: int
     updated: int
+    excluded: int = 0
     errors: list = []
 
 

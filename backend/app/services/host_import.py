@@ -86,6 +86,25 @@ def _parse_port(value) -> int:
     return 22
 
 
+def apply_exclude_rules(rows, exclude_rules: str):
+    """按行拆分排除规则,主机名或 group_name 包含任一非空规则(不区分大小写)即跳过。
+
+    返回 (kept_rows, excluded_count)。
+    """
+    rules = [r.strip().lower() for r in (exclude_rules or "").splitlines() if r.strip()]
+    if not rules:
+        return rows, 0
+    kept = []
+    excluded = 0
+    for item in rows:
+        haystacks = (item["hostname"].lower(), (item.get("group_name") or "").lower())
+        if any(rule in h for rule in rules for h in haystacks):
+            excluded += 1
+        else:
+            kept.append(item)
+    return kept, excluded
+
+
 def upsert_hosts(db, inventory_id: int, rows):
     """按 (inventory_id, hostname) upsert,返回 (added, updated)。"""
     added = 0

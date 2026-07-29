@@ -71,7 +71,16 @@ CSV 格式:支持带表头(`hostname,port,group_name,vars,comment`,列可缺省�
 
 Inventory：`{"id": 1, "name": "生产环境", "description": "...", "host_count": 5, "created_at": "...", "source_url": null, "last_sync_at": null, "sync_status": "never|ok|error", "sync_message": ""}`
 
-创建/更新清单时可选传 `source_url`(HTTP API 地址,返回 JSON 数组或 CSV 主机列表)。
+创建/更新清单时可选字段:
+- `source_url`: HTTP API 地址,返回 JSON 数组或 CSV 主机列表
+- `os_type`: `linux`(默认) / `windows`;windows 生成 inventory 时用 winrm 连接,默认端口 5985
+- `exclude_rules`: 排除规则文本,每行一条;import/sync 时主机名或分组名包含任一规则(不区分大小写)即跳过
+- `credential_id`: 绑定凭据(可空);执行任务时优先级: 模板凭据 > 清单凭据 > 清单默认账号密码
+- `default_username` / `default_password` / `default_port`: 未绑定凭据时的兜底连接参数;default_password 加密存储,响应永不回传,以 `has_default_password` 表示;default_port 可空(linux 默认 22,windows 默认 5985)
+
+import / sync 响应增加 `"excluded": 2`(被排除规则跳过的数量)。
+
+Inventory 响应对象增加以上字段(除 default_password)。
 
 Host：
 ```json

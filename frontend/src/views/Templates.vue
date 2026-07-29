@@ -52,8 +52,8 @@
             <el-option v-for="inv in inventories" :key="inv.id" :label="inv.name" :value="inv.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="凭据" prop="credential_id">
-          <el-select v-model="form.credential_id" placeholder="请选择登录凭据" class="full-width">
+        <el-form-item label="凭据">
+          <el-select v-model="form.credential_id" placeholder="可选,不选则用清单凭据或清单默认账号" class="full-width" clearable>
             <el-option v-for="c in credentials" :key="c.id" :label="`${c.name} (${c.username})`" :value="c.id" />
           </el-select>
         </el-form-item>
@@ -118,8 +118,7 @@ const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
   playbook: [{ required: true, message: '请选择 Playbook', trigger: 'change' }],
-  inventory_id: [{ required: true, message: '请选择清单', trigger: 'change' }],
-  credential_id: [{ required: true, message: '请选择凭据', trigger: 'change' }]
+  inventory_id: [{ required: true, message: '请选择清单', trigger: 'change' }]
 }
 
 async function load() {

@@ -56,6 +56,12 @@ def _migrate():
             "last_sync_at": "DATETIME",
             "sync_status": "VARCHAR(16) DEFAULT 'never'",
             "sync_message": "TEXT DEFAULT ''",
+            "os_type": "VARCHAR(16) DEFAULT 'linux'",
+            "exclude_rules": "TEXT DEFAULT ''",
+            "credential_id": "INTEGER",
+            "default_username": "VARCHAR(128) DEFAULT ''",
+            "default_password_encrypted": "TEXT",
+            "default_port": "INTEGER",
         },
     }
     with engine.connect() as conn:

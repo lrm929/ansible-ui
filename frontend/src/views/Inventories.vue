@@ -14,7 +14,15 @@
             highlight-current-row
             @current-change="onSelectInv"
           >
-            <el-table-column prop="name" label="名称" min-width="110" show-overflow-tooltip />
+            <el-table-column label="名称" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">
+                <el-tag :type="row.os_type === 'windows' ? 'primary' : 'success'" size="small" class="os-tag">
+                  {{ row.os_type === 'windows' ? 'Windows' : 'Linux' }}
+                </el-tag>
+                {{ row.name }}
+                <div v-if="row.credential_name" class="cred-name">凭证:{{ row.credential_name }}</div>
+              </template>
+            </el-table-column>
             <el-table-column prop="host_count" label="主机数" width="70" />
             <el-table-column label="自动拉取" width="150">
               <template #default="{ row }">
@@ -100,16 +108,64 @@
     </el-row>
 
     <!-- 清单新增/编辑对话框 -->
-    <el-dialog v-model="invDialogVisible" :title="invForm.id ? '编辑清单' : '新增清单'" width="440px" :close-on-click-modal="false">
-      <el-form ref="invFormRef" :model="invForm" :rules="invRules" label-width="80px">
-        <el-form-item label="名称" prop="name">
+    <el-dialog v-model="invDialogVisible" :title="invForm.id ? '编辑清单' : '新增清单'" width="560px" :close-on-click-modal="false">
+      <el-form ref="invFormRef" :model="invForm" :rules="invRules" label-width="110px">
+        <el-form-item label="清单名称" prop="name">
           <el-input v-model="invForm.name" placeholder="请输入清单名称" />
+        </el-form-item>
+        <el-form-item label="系统类型" prop="os_type">
+          <el-select v-model="invForm.os_type" class="full-width" @change="onOsTypeChange">
+            <el-option label="Linux (SSH)" value="linux" />
+            <el-option label="Windows (WinRM)" value="windows" />
+          </el-select>
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="invForm.description" type="textarea" :rows="2" placeholder="请输入描述(可选)" />
         </el-form-item>
-        <el-form-item label="拉取地址">
-          <el-input v-model="invForm.source_url" placeholder="如 http://资产平台/api/hosts,返回 JSON 或 CSV" clearable />
+        <el-form-item label="资产接口 URL">
+          <el-input v-model="invForm.source_url" type="textarea" :rows="2" placeholder="如 http://资产平台/api/hosts,返回 JSON 或 CSV" clearable />
+        </el-form-item>
+        <el-form-item label="本地资产文件">
+          <el-upload
+            :auto-upload="false"
+            :limit="1"
+            accept=".csv,text/csv"
+            :on-change="onCsvSelected"
+            :on-remove="onCsvRemoved"
+            class="csv-select"
+          >
+            <el-button size="small" :icon="Upload">选择文件</el-button>
+            <template #tip>
+              <div class="upload-tip">保存清单后自动导入,支持带表头或无表头 CSV</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="排除规则">
+          <el-input v-model="invForm.exclude_rules" type="textarea" :rows="3" placeholder="每行一条,主机名或分组包含即排除,如 Web" />
+        </el-form-item>
+        <el-form-item label="选择凭证">
+          <el-select v-model="invForm.credential_id" placeholder="可选" class="full-width" clearable>
+            <el-option v-for="c in credentials" :key="c.id" :label="`${c.name} (${c.username})`" :value="c.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="默认账号">
+          <el-input
+            v-model="invForm.default_username"
+            :disabled="!!invForm.credential_id"
+            :placeholder="invForm.credential_id ? '已选择凭证,无需填写' : '如 root / Administrator(可选)'"
+          />
+        </el-form-item>
+        <el-form-item label="默认密码">
+          <el-input
+            v-model="invForm.default_password"
+            type="password"
+            show-password
+            :disabled="!!invForm.credential_id"
+            :placeholder="defaultPasswordPlaceholder"
+          />
+        </el-form-item>
+        <el-form-item label="默认端口">
+          <el-input-number v-model="invForm.default_port" :min="1" :max="65535" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -146,7 +202,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Upload } from '@element-plus/icons-vue'
 import api from '../api'
@@ -154,6 +210,7 @@ import { formatTime } from '../utils/format'
 
 const inventories = ref([])
 const hosts = ref([])
+const credentials = ref([])
 const currentInv = ref(null)
 const invLoading = ref(false)
 const hostLoading = ref(false)
@@ -163,9 +220,40 @@ const syncing = ref(false)
 const invDialogVisible = ref(false)
 const invSaving = ref(false)
 const invFormRef = ref(null)
-const invForm = reactive({ id: null, name: '', description: '', source_url: '' })
+const invForm = reactive({
+  id: null,
+  name: '',
+  os_type: 'linux',
+  description: '',
+  source_url: '',
+  exclude_rules: '',
+  credential_id: null,
+  default_username: '',
+  default_password: '',
+  default_port: 22
+})
 const invRules = {
-  name: [{ required: true, message: '请输入清单名称', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入清单名称', trigger: 'blur' }],
+  os_type: [{ required: true, message: '请选择系统类型', trigger: 'change' }]
+}
+// 对话框里选中待导入的 CSV 原始文件(保存清单成功后才真正上传)
+const pendingCsv = ref(null)
+
+const defaultPasswordPlaceholder = computed(() => {
+  if (invForm.credential_id) return '已选择凭证,无需填写'
+  return invForm.id ? '留空表示保持原密码不变' : '可选'
+})
+
+function onOsTypeChange(osType) {
+  invForm.default_port = osType === 'windows' ? 5985 : 22
+}
+
+function onCsvSelected(uploadFile) {
+  pendingCsv.value = uploadFile.raw
+}
+
+function onCsvRemoved() {
+  pendingCsv.value = null
 }
 
 // 主机对话框
@@ -222,15 +310,33 @@ function onSelectInv(row) {
 }
 
 function openInvDialog(row) {
+  pendingCsv.value = null
   if (row) {
     Object.assign(invForm, {
       id: row.id,
       name: row.name,
+      os_type: row.os_type || 'linux',
       description: row.description || '',
-      source_url: row.source_url || ''
+      source_url: row.source_url || '',
+      exclude_rules: row.exclude_rules || '',
+      credential_id: row.credential_id,
+      default_username: row.default_username || '',
+      default_password: '',
+      default_port: row.default_port || (row.os_type === 'windows' ? 5985 : 22)
     })
   } else {
-    Object.assign(invForm, { id: null, name: '', description: '', source_url: '' })
+    Object.assign(invForm, {
+      id: null,
+      name: '',
+      os_type: 'linux',
+      description: '',
+      source_url: '',
+      exclude_rules: '',
+      credential_id: null,
+      default_username: '',
+      default_password: '',
+      default_port: 22
+    })
   }
   invDialogVisible.value = true
 }
@@ -241,17 +347,39 @@ async function saveInv() {
   try {
     const payload = {
       name: invForm.name,
+      os_type: invForm.os_type,
       description: invForm.description,
-      source_url: invForm.source_url.trim()
+      source_url: invForm.source_url.trim(),
+      exclude_rules: invForm.exclude_rules,
+      credential_id: invForm.credential_id || 0, // 0 表示清除绑定
+      default_username: invForm.credential_id ? '' : invForm.default_username,
+      default_port: invForm.default_port
     }
+    if (invForm.default_password) {
+      payload.default_password = invForm.default_password
+    }
+    let savedId = invForm.id
     if (invForm.id) {
       await api.put(`/inventories/${invForm.id}`, payload)
       ElMessage.success('清单已更新')
     } else {
-      await api.post('/inventories', payload)
+      const { data } = await api.post('/inventories', payload)
+      savedId = data.id
       ElMessage.success('清单已创建')
     }
     invDialogVisible.value = false
+    // 保存成功后若选了本地资产文件,立即导入
+    if (pendingCsv.value && savedId) {
+      const fd = new FormData()
+      fd.append('file', pendingCsv.value)
+      pendingCsv.value = null
+      try {
+        const { data } = await api.post(`/inventories/${savedId}/hosts/import`, fd)
+        showImportResult(data)
+      } catch {
+        // 错误提示由拦截器统一处理
+      }
+    }
     await loadInventories()
   } catch {
     // 错误提示由拦截器统一处理
@@ -375,7 +503,9 @@ async function syncInv() {
 }
 
 function showImportResult(data) {
-  ElMessage.success(`新增 ${data.added} 台,更新 ${data.updated} 台`)
+  let msg = `新增 ${data.added} 台,更新 ${data.updated} 台`
+  if (data.excluded) msg += `,排除 ${data.excluded} 台`
+  ElMessage.success(msg)
   if (data.errors && data.errors.length) {
     ElMessageBox.alert(data.errors.join('\n'), '部分行导入失败', {
       confirmButtonText: '知道了',
@@ -396,7 +526,15 @@ function syncStatusText(status) {
   return '未同步'
 }
 
-onMounted(() => loadInventories(false))
+onMounted(async () => {
+  loadInventories(false)
+  try {
+    const { data } = await api.get('/credentials')
+    credentials.value = data
+  } catch {
+    // 错误提示由拦截器统一处理
+  }
+})
 </script>
 
 <style scoped>
@@ -418,6 +556,30 @@ onMounted(() => loadInventories(false))
 }
 
 .sync-time {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+}
+
+.os-tag {
+  margin-right: 6px;
+}
+
+.cred-name {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.csv-select {
+  width: 100%;
+}
+
+.upload-tip {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;

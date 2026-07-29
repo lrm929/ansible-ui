@@ -5,7 +5,7 @@
 ## 功能
 
 - 📊 仪表盘:主机/任务统计、最近执行记录
-- 🖥️ 主机清单:分组管理主机,支持 CSV 上传导入与 HTTP API 自动拉取
+- 🖥️ 主机清单:支持 Linux/Windows 系统类型、CSV 上传导入与 HTTP API 自动拉取、排除规则、清单级凭据
 - 🔑 凭据管理:SSH 密码 / 私钥,Fernet 加密存储,永不回传明文
 - 📦 项目管理:本地目录或 Git 仓库方式接入 Playbook,一键同步
 - 📋 任务模板:Playbook + 清单 + 凭据 + extra_vars/limit/tags 组合成可复用模板

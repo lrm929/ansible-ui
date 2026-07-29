@@ -70,10 +70,17 @@ def run_task(task_id: int):
 
         project = db.query(Project).filter(Project.id == template.project_id).first()
         hosts = db.query(Host).filter(Host.inventory_id == template.inventory_id).all()
+        # 凭据优先级:模板 credential_id > 清单 credential_id > 清单默认账号密码(在 inventory_gen 内处理)
         credential = None
         if template.credential_id:
             credential = (
                 db.query(Credential).filter(Credential.id == template.credential_id).first()
+            )
+        if credential is None and template.inventory and template.inventory.credential_id:
+            credential = (
+                db.query(Credential)
+                .filter(Credential.id == template.inventory.credential_id)
+                .first()
             )
 
         task.status = "running"
