@@ -59,6 +59,12 @@ const routes = [
         name: 'Schedules',
         component: () => import('../views/Schedules.vue'),
         meta: { title: '定时任务' }
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('../views/Settings.vue'),
+        meta: { title: '通知设置' }
       }
     ]
   },

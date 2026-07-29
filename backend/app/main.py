@@ -16,6 +16,7 @@ from .routers import (
     inventories,
     projects,
     schedules,
+    settings,
     tasks,
     templates,
 )
@@ -33,7 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, dashboard, credentials, inventories, projects, templates, tasks, schedules):
+for module in (auth, dashboard, credentials, inventories, projects, templates, tasks, schedules, settings):
     app.include_router(module.router)
 
 

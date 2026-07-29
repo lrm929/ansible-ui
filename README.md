@@ -11,6 +11,7 @@
 - 📋 任务模板:Playbook + 清单 + 凭据 + extra_vars/limit/tags 组合成可复用模板
 - ▶️ 任务执行:WebSocket 实时日志、停止任务、完整历史记录
 - ⏰ 定时任务:标准 cron 表达式调度模板执行
+- 📢 通知:企业微信 webhook 任务结果通知
 - 👤 用户:登录认证、修改密码
 
 ## 技术栈
@@ -42,6 +43,17 @@ npm run dev                      # http://127.0.0.1:5173,已配置代理到 8000
 
 ## 生产部署
 
+一键脚本（自动检查并安装 python3/venv/git/ansible 依赖，注册 systemd 服务并启动）:
+
+```bash
+git clone https://github.com/lrm929/ansible-ui.git
+cd ansible-ui
+# 前端需先构建(本机有 Node 时): cd frontend && npm install && npm run build && cd ..
+sudo bash install.sh          # 默认 /opt/ansible-ui,端口 8000;PORT=9000 可改
+```
+
+或手动部署：
+
 ```bash
 cd frontend && npm run build     # 产物输出到 frontend/dist
 cd ../backend && python run.py   # 后端直接托管 dist,访问 http://服务器IP:8000
@@ -61,7 +73,6 @@ cd ../backend && python run.py   # 后端直接托管 dist,访问 http://服务�
 ## 路线图
 
 - [ ] 多用户与角色权限(管理员/操作员/只读)
-- [ ] 任务 webhook 通知(钉钉/企业微信)
 - [ ] Ansible Galaxy role 安装支持
 - [ ] 任务执行前的 dry-run(--check)模式
 - [ ] Docker 一键部署

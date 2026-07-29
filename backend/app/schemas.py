@@ -232,6 +232,14 @@ class ScheduleOut(BaseModel):
     created_at: datetime
 
 
+# ---------- 通知设置 ----------
+class WebhookConfig(BaseModel):
+    webhook_url: str = ""
+    enabled: bool = False
+    notify_on_success: bool = True
+    notify_on_failure: bool = True
+
+
 # ---------- 仪表盘 ----------
 class DashboardOut(BaseModel):
     hosts: int

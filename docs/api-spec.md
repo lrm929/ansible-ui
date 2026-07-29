@@ -165,6 +165,24 @@ Schedule：
 }
 ```
 
+## 通知设置 Webhook（企业微信）
+
+### GET /api/settings/webhook → WebhookConfig
+### PUT /api/settings/webhook → WebhookConfig
+### POST /api/settings/webhook/test → `{"detail": "测试消息已发送"}`（发送失败返回 502 + 原因）
+
+WebhookConfig：
+```json
+{
+  "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx",
+  "enabled": true,
+  "notify_on_success": true,
+  "notify_on_failure": true
+}
+```
+
+通知触发时机：任务执行结束（success / failed / stopped）后，若 enabled 且对应状态开关打开，向 webhook_url POST 企业微信 markdown 消息。通知发送失败只记录日志，不影响任务状态。
+
 ## 约定补充
 
 - 时间格式 ISO 8601 字符串，后端存 UTC，前端本地格式化显示。

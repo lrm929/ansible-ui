@@ -102,6 +102,13 @@ class Task(Base):
     template = relationship("Template")
 
 
+class Setting(Base):
+    __tablename__ = "settings"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, default="")
+
+
 class Schedule(Base):
     __tablename__ = "schedules"
 

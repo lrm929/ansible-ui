@@ -11,6 +11,7 @@ from ..config import REPOS_DIR
 from ..database import SessionLocal
 from ..models import Credential, Host, Project, Task, Template
 from .inventory_gen import generate_inventory_file
+from .notifier import notify_task_finished
 from .ws_manager import ws_manager
 
 _executor = ThreadPoolExecutor(max_workers=4)
@@ -64,6 +65,7 @@ def run_task(task_id: int):
             _append_output(db, task, "任务模板不存在,无法执行")
             db.commit()
             ws_manager.broadcast_end(task_id, "failed")
+            _notify(task_id)
             return
 
         project = db.query(Project).filter(Project.id == template.project_id).first()
@@ -151,6 +153,7 @@ def run_task(task_id: int):
         task.finished_at = datetime.utcnow()
         db.commit()
         ws_manager.broadcast_end(task_id, status)
+        _notify(task_id)
     except _TaskError as exc:
         _finish_with_error(db, task_id, str(exc))
     except Exception as exc:  # 兜底,绝不能让线程静默崩溃
@@ -169,6 +172,14 @@ def run_task(task_id: int):
         db.close()
 
 
+def _notify(task_id: int):
+    """任务终态后发送通知,失败绝不影响主流程。"""
+    try:
+        notify_task_finished(task_id)
+    except Exception:
+        pass
+
+
 def _finish_with_error(db, task_id: int, message: str):
     try:
         task = db.query(Task).filter(Task.id == task_id).first()
@@ -182,6 +193,7 @@ def _finish_with_error(db, task_id: int, message: str):
         db.commit()
         ws_manager.broadcast_log(task_id, message)
         ws_manager.broadcast_end(task_id, "failed")
+        _notify(task_id)
     except Exception:
         pass
 
