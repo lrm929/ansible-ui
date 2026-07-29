@@ -114,7 +114,8 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable --now ansible-ui
+systemctl enable ansible-ui >/dev/null 2>&1
+systemctl restart ansible-ui   # restart 而非 start:重复执行脚本时代码更新必须生效
 
 # ---------- 防火墙 ----------
 if systemctl is-active firewalld >/dev/null 2>&1; then
