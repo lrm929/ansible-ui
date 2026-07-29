@@ -1,117 +1,60 @@
 <template>
   <div class="page-container">
-    <el-row :gutter="16">
-      <!-- 左侧:清单列表 -->
-      <el-col :span="8">
-        <el-card shadow="never" class="page-card">
-          <div class="toolbar">
-            <span class="title">清单</span>
-            <el-button v-if="!isViewer" type="primary" size="small" :icon="Plus" @click="openInvDialog()">新增清单</el-button>
-          </div>
-          <el-table
-            v-loading="invLoading"
-            :data="inventories"
-            highlight-current-row
-            @current-change="onSelectInv"
-          >
-            <el-table-column label="名称" min-width="150" show-overflow-tooltip>
-              <template #default="{ row }">
-                <el-tag :type="row.os_type === 'windows' ? 'primary' : 'success'" size="small" class="os-tag">
-                  {{ row.os_type === 'windows' ? 'Windows' : 'Linux' }}
-                </el-tag>
-                {{ row.name }}
-                <div v-if="row.credential_name" class="cred-name">凭证:{{ row.credential_name }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="host_count" label="主机数" width="70" />
-            <el-table-column label="自动拉取" width="150">
-              <template #default="{ row }">
-                <template v-if="row.source_url">
-                  <el-tag :type="syncTagType(row.sync_status)" size="small">
-                    {{ syncStatusText(row.sync_status) }}
-                  </el-tag>
-                  <div v-if="row.last_sync_at" class="sync-time">{{ formatTime(row.last_sync_at) }}</div>
-                </template>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
-              <template #default="{ row }">
-                <el-button
-                  v-if="row.source_url && !isViewer"
-                  text
-                  type="success"
-                  size="small"
-                  :loading="syncingId === row.id"
-                  @click.stop="syncInv(row)"
-                >
-                  同步
-                </el-button>
-                <template v-if="!isViewer">
-                  <el-button text type="primary" size="small" @click.stop="openInvDialog(row)">编辑</el-button>
-                  <el-button text type="danger" size="small" @click.stop="deleteInv(row)">删除</el-button>
-                </template>
-              </template>
-            </el-table-column>
-            <template #empty>暂无清单,请先新增</template>
-          </el-table>
-        </el-card>
-      </el-col>
-
-      <!-- 右侧:清单概要 -->
-      <el-col :span="16">
-        <el-card shadow="never" class="page-card" v-loading="hostLoading">
-          <div class="toolbar">
-            <span class="title">
-              清单概要{{ currentInv ? ` - ${currentInv.name}` : '' }}
-              <span v-if="currentInv?.description" class="inv-desc">{{ currentInv.description }}</span>
-            </span>
-            <el-button size="small" :disabled="!currentInv" @click="drawerVisible = true">查看主机</el-button>
-          </div>
-          <template v-if="currentInv">
-            <div class="summary-block">
-              <div class="summary-item">
-                <div class="summary-num">{{ summary.total }}</div>
-                <div class="summary-label">主机总数</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-num">{{ summary.groupList.length }}</div>
-                <div class="summary-label">分组数量</div>
-              </div>
-            </div>
-            <el-divider />
-            <div class="summary-section">
-              <div class="summary-title">分组分布</div>
-              <template v-if="summary.groupList.length">
-                <el-tag v-for="g in summary.groupList" :key="g.name" class="group-tag">
-                  {{ g.name }} ({{ g.count }} 台)
-                </el-tag>
-              </template>
-              <span v-else class="empty-text">暂无主机</span>
-            </div>
-            <div class="summary-section">
-              <div class="summary-title">端口分布</div>
-              <template v-if="summary.portList.length">
-                <el-tag v-for="p in summary.portList" :key="p.port" type="info" class="group-tag">
-                  {{ p.port }}×{{ p.count }}
-                </el-tag>
-              </template>
-              <span v-else class="empty-text">-</span>
-            </div>
-            <div class="summary-section">
-              <div class="summary-title">最近备注</div>
-              <template v-if="summary.comments.length">
-                <div v-for="(c, i) in summary.comments" :key="i" class="comment-line">
-                  <span class="comment-host">{{ c.hostname }}</span>{{ c.comment }}
-                </div>
-              </template>
-              <span v-else class="empty-text">-</span>
-            </div>
+    <el-card shadow="never" class="page-card">
+      <div class="toolbar">
+        <span class="title">主机清单</span>
+        <el-button v-if="!isViewer" type="primary" :icon="Plus" @click="openInvDialog()">新增清单</el-button>
+      </div>
+      <el-table v-loading="invLoading" :data="inventories" stripe>
+        <el-table-column label="名称" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-tag :type="row.os_type === 'windows' ? 'primary' : 'success'" size="small" class="os-tag">
+              {{ row.os_type === 'windows' ? 'Windows' : 'Linux' }}
+            </el-tag>
+            {{ row.name }}
+            <div v-if="row.credential_name" class="cred-name">凭证:{{ row.credential_name }}</div>
           </template>
-          <el-empty v-else description="请先选择左侧清单" :image-size="80" />
-        </el-card>
-      </el-col>
-    </el-row>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.description || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="host_count" label="主机数" width="80" />
+        <el-table-column label="自动拉取" width="150">
+          <template #default="{ row }">
+            <template v-if="row.source_url">
+              <el-tag :type="syncTagType(row.sync_status)" size="small">
+                {{ syncStatusText(row.sync_status) }}
+              </el-tag>
+              <div v-if="row.last_sync_at" class="sync-time">{{ formatTime(row.last_sync_at) }}</div>
+            </template>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="170">
+          <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="230" fixed="right">
+          <template #default="{ row }">
+            <el-button text type="primary" size="small" @click="openHostsDrawer(row)">查看主机</el-button>
+            <el-button
+              v-if="row.source_url && !isViewer"
+              text
+              type="success"
+              size="small"
+              :loading="syncingId === row.id"
+              @click="syncInv(row)"
+            >
+              同步
+            </el-button>
+            <template v-if="!isViewer">
+              <el-button text type="primary" size="small" @click="openInvDialog(row)">编辑</el-button>
+              <el-button text type="danger" size="small" @click="deleteInv(row)">删除</el-button>
+            </template>
+          </template>
+        </el-table-column>
+        <template #empty>暂无清单,请先新增</template>
+      </el-table>
+    </el-card>
 
     <!-- 主机列表抽屉 -->
     <el-drawer
@@ -267,26 +210,6 @@ const hostLoading = ref(false)
 const syncingId = ref(null)
 const drawerVisible = ref(false)
 
-// 概要聚合(前端从 hosts 计算,不加后端接口)
-const summary = computed(() => {
-  const list = hosts.value
-  const groups = {}
-  const ports = {}
-  for (const h of list) {
-    const g = h.group_name || '(未分组)'
-    groups[g] = (groups[g] || 0) + 1
-    ports[h.port] = (ports[h.port] || 0) + 1
-  }
-  const groupList = Object.entries(groups)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-  const portList = Object.entries(ports)
-    .map(([port, count]) => ({ port, count }))
-    .sort((a, b) => b.count - a.count)
-  const comments = list.filter((h) => h.comment).slice(-5).reverse()
-  return { total: list.length, groupList, portList, comments }
-})
-
 // 清单对话框
 const invDialogVisible = ref(false)
 const invSaving = ref(false)
@@ -337,22 +260,21 @@ const hostRules = {
   port: [{ required: true, message: '请输入端口', trigger: 'blur' }]
 }
 
-async function loadInventories(keepSelection = true) {
+async function loadInventories() {
   invLoading.value = true
   try {
     const { data } = await api.get('/inventories')
     inventories.value = data
-    if (keepSelection && currentInv.value) {
+    // 抽屉打开时同步刷新其主机列表
+    if (drawerVisible.value && currentInv.value) {
       const found = data.find((i) => i.id === currentInv.value.id)
       currentInv.value = found || null
-    }
-    if (!currentInv.value && data.length > 0) {
-      currentInv.value = data[0]
-    }
-    if (currentInv.value) {
-      await loadHosts()
-    } else {
-      hosts.value = []
+      if (currentInv.value) {
+        await loadHosts()
+      } else {
+        hosts.value = []
+        drawerVisible.value = false
+      }
     }
   } catch {
     // 错误提示由拦截器统一处理
@@ -374,9 +296,9 @@ async function loadHosts() {
   }
 }
 
-function onSelectInv(row) {
-  if (!row) return
+function openHostsDrawer(row) {
   currentInv.value = row
+  drawerVisible.value = true
   loadHosts()
 }
 
@@ -472,8 +394,11 @@ async function deleteInv(row) {
   try {
     await api.delete(`/inventories/${row.id}`)
     ElMessage.success('清单已删除')
-    if (currentInv.value?.id === row.id) currentInv.value = null
-    await loadInventories(false)
+    if (currentInv.value?.id === row.id) {
+      currentInv.value = null
+      drawerVisible.value = false
+    }
+    await loadInventories()
   } catch {
     // 错误提示由拦截器统一处理
   }
@@ -554,12 +479,13 @@ async function syncInv(row) {
   } finally {
     syncingId.value = null
   }
-  // 同步完成刷新概要,保证每次同步后都是最新数据
+  // 同步完成刷新清单列表(最新 host_count 与同步状态),抽屉打开时也刷新主机
   await loadInventories()
 }
 
 function showImportResult(data) {
   let msg = `新增 ${data.added} 台,更新 ${data.updated} 台`
+  if (data.removed) msg += `,删除 ${data.removed} 台`
   if (data.excluded) msg += `,排除 ${data.excluded} 台`
   ElMessage.success(msg)
   if (data.errors && data.errors.length) {
@@ -583,7 +509,7 @@ function syncStatusText(status) {
 }
 
 onMounted(async () => {
-  loadInventories(false)
+  loadInventories()
   try {
     const { data } = await api.get('/credentials')
     credentials.value = data
@@ -594,13 +520,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.inv-desc {
-  font-size: 12px;
-  color: #909399;
-  font-weight: normal;
-  margin-left: 8px;
-}
-
 .sync-time {
   font-size: 12px;
   color: #909399;
@@ -629,61 +548,6 @@ onMounted(async () => {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
-}
-
-.summary-block {
-  display: flex;
-  gap: 48px;
-  padding: 8px 0;
-}
-
-.summary-item {
-  text-align: center;
-}
-
-.summary-num {
-  font-size: 28px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.summary-label {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.summary-section {
-  margin-bottom: 16px;
-}
-
-.summary-title {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 8px;
-}
-
-.group-tag {
-  margin-right: 8px;
-  margin-bottom: 6px;
-}
-
-.empty-text {
-  color: #c0c4cc;
-  font-size: 13px;
-}
-
-.comment-line {
-  font-size: 13px;
-  color: #606266;
-  line-height: 1.9;
-}
-
-.comment-host {
-  color: #909399;
-  margin-right: 8px;
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 12px;
 }
 
 .drawer-toolbar {

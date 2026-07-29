@@ -246,19 +246,39 @@ def sync_hosts(
         _sync_failed(db, inv, "拉取失败: {}".format(exc))
     try:
         rows, errors = _parse_sync_body(body, content_type)
-        if not rows and not errors:
-            raise ValueError("返回内容为空或无法解析")
     except Exception as exc:
         _sync_failed(db, inv, "解析失败: {}".format(exc))
+    # 安全保护:解析 0 条且有错误(疑似源数据异常),不删任何主机,防止源故障清空清单
+    if not rows and errors:
+        _sync_failed(
+            db,
+            inv,
+            "源数据疑似异常: 解析 0 条且有 {} 条错误,已中止同步".format(len(errors)),
+        )
     rows, excluded = host_import.apply_exclude_rules(rows, inv.exclude_rules)
     added, updated = host_import.upsert_hosts(db, inv_id, rows)
+    # 全量替换:删除清单中不在本次拉取结果里的主机(rows 为 0 且源合法为空时清空)
+    keep = {r["hostname"] for r in rows}
+    if keep:
+        stale = (
+            db.query(Host)
+            .filter(Host.inventory_id == inv_id, ~Host.hostname.in_(keep))
+            .all()
+        )
+    else:
+        stale = db.query(Host).filter(Host.inventory_id == inv_id).all()
+    removed = len(stale)
+    for host in stale:
+        db.delete(host)
     inv.sync_status = "ok"
-    inv.sync_message = "新增 {} 台,更新 {} 台".format(added, updated)
+    inv.sync_message = "新增 {} 台,更新 {} 台,删除 {} 台".format(added, updated, removed)
     if excluded:
         inv.sync_message += ",排除 {} 台".format(excluded)
     inv.last_sync_at = datetime.utcnow()
     db.commit()
-    return HostImportResult(added=added, updated=updated, excluded=excluded, errors=errors)
+    return HostImportResult(
+        added=added, updated=updated, removed=removed, excluded=excluded, errors=errors
+    )
 
 
 def _sync_failed(db: Session, inv: Inventory, message: str):

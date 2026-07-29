@@ -1,9 +1,9 @@
 <template>
-  <div class="login-page">
+  <div class="login-page" :style="bgStyle">
     <el-card class="login-card">
       <div class="login-header">
         <el-icon :size="36" color="#409eff"><Platform /></el-icon>
-        <h1 class="login-title">Ansible 运维管理平台</h1>
+        <h1 class="login-title">{{ siteName }}</h1>
       </div>
       <el-form
         ref="formRef"
@@ -40,14 +40,39 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
+import api from '../api'
 
 const router = useRouter()
 const auth = useAuthStore()
+
+// 系统名称与登录背景(挂载时拉一次公开接口,失败静默用默认值)
+const siteName = ref('Ansible 运维管理平台')
+const hasLoginBg = ref(false)
+const bgTs = Date.now()
+
+const bgStyle = computed(() => {
+  if (!hasLoginBg.value) return {}
+  return {
+    backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url(/api/system/login-bg?t=${bgTs})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center'
+  }
+})
+
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/system/info')
+    siteName.value = data.site_name
+    hasLoginBg.value = data.has_login_bg
+  } catch {
+    // 静默用默认值
+  }
+})
 
 const formRef = ref(null)
 const loading = ref(false)

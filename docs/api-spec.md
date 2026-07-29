@@ -74,7 +74,9 @@ Credential：
 - CSV(规则同上传)
 - **LoadGameData 资产接口**:无换行的 `|` 分隔字段流,每条记录固定 18 列(末两列为空),取第 3 列为服务器 IP(hostname)、第 6 列为昵称(comment);分组取昵称前缀——去掉昵称尾部数字再去掉末尾的 `_`/`-` 即为前缀,前缀相同的机器归为一组(group_name)。
 
-upsert 入库,更新清单 sync_status/sync_message/last_sync_at。响应同 import。
+**同步为全量替换语义**:upsert 后,清单中不在本次拉取结果里的主机一律删除,保证清单与源完全一致。响应:`{"added": 3, "updated": 2, "removed": 5, "excluded": 0, "errors": []}`。若解析结果 0 条且 errors 非空(疑似源数据异常),不执行删除,返回 502 并置 sync_status=error(防止源故障清空清单)。
+
+更新清单 sync_status/sync_message/last_sync_at。
 
 Inventory：`{"id": 1, "name": "生产环境", "description": "...", "host_count": 5, "created_at": "...", "source_url": null, "last_sync_at": null, "sync_status": "never|ok|error", "sync_message": ""}`
 
@@ -205,6 +207,16 @@ WebhookConfig：
 ```
 
 通知触发时机：任务执行结束（success / failed / stopped）后，若 enabled 且对应状态开关打开，向 webhook_url POST 企业微信 markdown 消息。通知发送失败只记录日志，不影响任务状态。
+
+## 系统信息 System（系统名称 / 登录背景）
+
+### GET /api/system/info → `{"site_name": "Ansible 运维管理平台", "has_login_bg": false}`  （**公开**,登录页要用）
+### PUT /api/system/info → 同左  `{"site_name": "新名称"}`
+### POST /api/system/login-bg  （multipart 上传图片,字段名 file;jpg/png/webp,≤2MB）→ `{"detail": "已更新"}`
+### GET /api/system/login-bg  （**公开**,返回图片;未设置 404）
+### DELETE /api/system/login-bg → `{"detail": "已删除"}`
+
+登录页标题与主界面菜单标题均显示 site_name;登录页背景在设置了图片时使用图片(全屏覆盖 + 半透明遮罩保证表单可读)。
 
 ## 用户与权限
 

@@ -120,6 +120,7 @@ class InventoryOut(BaseModel):
 class HostImportResult(BaseModel):
     added: int
     updated: int
+    removed: int = 0
     excluded: int = 0
     errors: list = []
 
@@ -279,6 +280,11 @@ class ScheduleOut(BaseModel):
     enabled: bool
     last_run_at: Optional[datetime] = None
     created_at: datetime
+
+
+# ---------- 系统信息 ----------
+class SiteInfo(BaseModel):
+    site_name: str
 
 
 # ---------- 通知设置 ----------

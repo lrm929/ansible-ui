@@ -5,7 +5,7 @@
 ## 功能
 
 - 📊 仪表盘:主机/任务统计、最近执行记录
-- 🖥️ 主机清单:支持 Linux/Windows 类型、CSV/TXT 本地上传、HTTP API(LoadGameData/JSON/CSV)自动拉取、排除规则、清单级凭据
+- 🖥️ 主机清单:支持 Linux/Windows 类型、CSV/TXT 本地上传、HTTP API(LoadGameData/JSON/CSV)自动拉取、同步全量替换、排除规则、清单级凭据
 - 🔑 凭据管理:SSH 密码 / 私钥,Fernet 加密存储,永不回传明文
 - 📦 项目管理:本地目录或 Git 仓库方式接入 Playbook,一键同步
 - 📋 任务模板:Playbook + 清单 + 凭据 + extra_vars/limit/tags 组合成可复用模板
@@ -13,7 +13,7 @@
 - ⏰ 定时任务:标准 cron 表达式调度模板执行
 - 📢 通知:企业微信 webhook 任务结果通知
 - 📝 Playbook 管理:在线新建/查看/编辑本地项目的 playbook 文件(Git 项目只读)
-- 👥 多用户与权限:管理员/操作员/只读三级角色
+- 👥 多用户与权限 + 系统设置:用户/角色/通知/系统名称/登录背景集中管理
 - 👤 用户:登录认证、修改密码
 
 ## 技术栈

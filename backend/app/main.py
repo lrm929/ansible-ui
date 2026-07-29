@@ -18,6 +18,7 @@ from .routers import (
     projects,
     schedules,
     settings,
+    system,
     tasks,
     templates,
     users,
@@ -99,7 +100,7 @@ async def _reject(send, status: int, detail: str):
 
 app.add_middleware(PermissionMiddleware)
 
-for module in (auth, dashboard, credentials, inventories, projects, templates, tasks, schedules, settings, users):
+for module in (auth, dashboard, credentials, inventories, projects, templates, tasks, schedules, settings, users, system):
     app.include_router(module.router)
 
 

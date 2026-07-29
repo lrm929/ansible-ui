@@ -3,7 +3,7 @@
     <el-aside width="220px" class="aside">
       <div class="logo">
         <el-icon :size="22" color="#fff"><Platform /></el-icon>
-        <span>Ansible 运维平台</span>
+        <span>{{ siteName }}</span>
       </div>
       <el-menu
         class="menu"
@@ -45,13 +45,9 @@
           <el-icon><Document /></el-icon>
           <span>Playbook</span>
         </el-menu-item>
-        <el-menu-item v-if="auth.user?.role === 'admin'" index="/users">
-          <el-icon><User /></el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
-        <el-menu-item index="/settings">
-          <el-icon><Bell /></el-icon>
-          <span>通知设置</span>
+        <el-menu-item index="/system">
+          <el-icon><Setting /></el-icon>
+          <span>系统设置</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -105,14 +101,26 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
+import api from '../api'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+// 系统名称(挂载时拉一次,失败静默用默认值)
+const siteName = ref('Ansible 运维管理平台')
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/system/info')
+    siteName.value = data.site_name
+  } catch {
+    // 公开接口失败时静默用默认值
+  }
+})
 
 const activeMenu = computed(() => {
   // 任务详情页高亮「任务记录」菜单

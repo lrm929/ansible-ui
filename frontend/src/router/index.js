@@ -68,15 +68,17 @@ const routes = [
       },
       {
         path: 'users',
-        name: 'Users',
-        component: () => import('../views/Users.vue'),
-        meta: { title: '用户管理', adminOnly: true }
+        redirect: '/system'
       },
       {
         path: 'settings',
-        name: 'Settings',
-        component: () => import('../views/Settings.vue'),
-        meta: { title: '通知设置' }
+        redirect: '/system'
+      },
+      {
+        path: 'system',
+        name: 'SystemSettings',
+        component: () => import('../views/SystemSettings.vue'),
+        meta: { title: '系统设置' }
       }
     ]
   },
