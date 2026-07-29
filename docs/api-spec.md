@@ -63,8 +63,15 @@ Credential：
 ### POST /api/inventories/{id}/hosts → Host
 ### PUT /api/hosts/{id} → Host
 ### DELETE /api/hosts/{id}
+### POST /api/inventories/{id}/hosts/import  （multipart 上传 CSV 文件,字段名 file）
+解析 CSV 导入主机,按 (inventory_id, hostname) upsert。响应:`{"added": 3, "updated": 2, "errors": ["第5行: 主机名为空"]}`
+CSV 格式:支持带表头(`hostname,port,group_name,vars,comment`,列可缺省、顺序不限)或无表头(每行第一列为主机名,其余忽略)。编码自动识别 utf-8-sig / gbk。
+### POST /api/inventories/{id}/sync  （从 source_url 拉取主机列表）
+要求清单已配置 source_url(未配置返回 400)。GET 该 URL,内容支持 JSON 数组(`[{"hostname": "...", "port": 22, ...}]`)或 CSV(规则同上传)。upsert 入库,更新清单 sync_status/sync_message/last_sync_at。响应同 import。
 
-Inventory：`{"id": 1, "name": "生产环境", "description": "...", "host_count": 5, "created_at": "..."}`
+Inventory：`{"id": 1, "name": "生产环境", "description": "...", "host_count": 5, "created_at": "...", "source_url": null, "last_sync_at": null, "sync_status": "never|ok|error", "sync_message": ""}`
+
+创建/更新清单时可选传 `source_url`(HTTP API 地址,返回 JSON 数组或 CSV 主机列表)。
 
 Host：
 ```json

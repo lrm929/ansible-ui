@@ -6,3 +6,4 @@ pyjwt
 cryptography
 apscheduler>=3.10,<4.0
 pydantic>=2.0
+python-multipart  # FastAPI UploadFile 支持(主机 CSV 导入需要)

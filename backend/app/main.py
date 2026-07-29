@@ -48,9 +48,36 @@ def _seed_admin():
         db.close()
 
 
+def _migrate():
+    """轻量迁移:为已存在的 SQLite 表补充新增列(create_all 不会改已有表)。"""
+    new_columns = {
+        "inventories": {
+            "source_url": "VARCHAR(512)",
+            "last_sync_at": "DATETIME",
+            "sync_status": "VARCHAR(16) DEFAULT 'never'",
+            "sync_message": "TEXT DEFAULT ''",
+        },
+    }
+    with engine.connect() as conn:
+        for table, columns in new_columns.items():
+            existing = {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    "PRAGMA table_info({})".format(table)
+                )
+            }
+            for column, ddl in columns.items():
+                if column not in existing:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE {} ADD COLUMN {} {}".format(table, column, ddl)
+                    )
+        conn.commit()
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    _migrate()
     _seed_admin()
     ws_manager.set_loop(asyncio.get_event_loop())
     scheduler_service.start_scheduler()

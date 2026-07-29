@@ -33,6 +33,10 @@ class Inventory(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(128), nullable=False)
     description = Column(String(512), default="")
+    source_url = Column(String(512), nullable=True)  # HTTP API 自动拉取地址
+    last_sync_at = Column(DateTime, nullable=True)
+    sync_status = Column(String(16), default="never")  # never | ok | error
+    sync_message = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     hosts = relationship("Host", back_populates="inventory", cascade="all, delete-orphan")

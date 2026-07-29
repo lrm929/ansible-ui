@@ -63,11 +63,13 @@ class CredentialOut(BaseModel):
 class InventoryCreate(BaseModel):
     name: str
     description: str = ""
+    source_url: Optional[str] = None
 
 
 class InventoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 class InventoryOut(BaseModel):
@@ -77,7 +79,17 @@ class InventoryOut(BaseModel):
     name: str
     description: str
     host_count: int = 0
+    source_url: Optional[str] = None
+    last_sync_at: Optional[datetime] = None
+    sync_status: str = "never"
+    sync_message: str = ""
     created_at: datetime
+
+
+class HostImportResult(BaseModel):
+    added: int
+    updated: int
+    errors: list = []
 
 
 class HostCreate(BaseModel):

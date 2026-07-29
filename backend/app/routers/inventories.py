@@ -1,6 +1,9 @@
+import json
+import urllib.request
+from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -8,12 +11,14 @@ from ..deps import get_current_user
 from ..models import Host, Inventory, User
 from ..schemas import (
     HostCreate,
+    HostImportResult,
     HostOut,
     HostUpdate,
     InventoryCreate,
     InventoryOut,
     InventoryUpdate,
 )
+from ..services import host_import
 
 router = APIRouter(prefix="/api", tags=["清单"])
 
@@ -24,6 +29,10 @@ def _to_out(inv: Inventory) -> InventoryOut:
         name=inv.name,
         description=inv.description or "",
         host_count=len(inv.hosts),
+        source_url=inv.source_url,
+        last_sync_at=inv.last_sync_at,
+        sync_status=inv.sync_status or "never",
+        sync_message=inv.sync_message or "",
         created_at=inv.created_at,
     )
 
@@ -49,7 +58,11 @@ def create_inventory(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    inv = Inventory(name=payload.name, description=payload.description)
+    inv = Inventory(
+        name=payload.name,
+        description=payload.description,
+        source_url=payload.source_url or None,
+    )
     db.add(inv)
     db.commit()
     db.refresh(inv)
@@ -68,6 +81,8 @@ def update_inventory(
         inv.name = payload.name
     if payload.description is not None:
         inv.description = payload.description
+    if payload.source_url is not None:
+        inv.source_url = payload.source_url or None
     db.commit()
     db.refresh(inv)
     return _to_out(inv)
@@ -149,3 +164,91 @@ def delete_host(
     db.delete(host)
     db.commit()
     return {"detail": "已删除"}
+
+
+@router.post("/inventories/{inv_id}/hosts/import", response_model=HostImportResult)
+def import_hosts(
+    inv_id: int,
+    file: UploadFile,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_inventory(db, inv_id)
+    data = file.file.read()
+    text = host_import.decode_csv_bytes(data)
+    rows, errors = host_import.parse_csv(text)
+    if not rows and not errors:
+        raise HTTPException(status_code=400, detail="CSV 内容为空或无法解析")
+    added, updated = host_import.upsert_hosts(db, inv_id, rows)
+    return HostImportResult(added=added, updated=updated, errors=errors)
+
+
+@router.post("/inventories/{inv_id}/sync", response_model=HostImportResult)
+def sync_hosts(
+    inv_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    inv = _get_inventory(db, inv_id)
+    if not inv.source_url:
+        raise HTTPException(status_code=400, detail="该清单未配置自动拉取地址(source_url)")
+    try:
+        req = urllib.request.Request(
+            inv.source_url, headers={"User-Agent": "ansible-ui"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content_type = resp.headers.get("Content-Type", "")
+            body = resp.read()
+    except Exception as exc:
+        _sync_failed(db, inv, "拉取失败: {}".format(exc))
+    try:
+        rows, errors = _parse_sync_body(body, content_type)
+        if not rows and not errors:
+            raise ValueError("返回内容为空或无法解析")
+    except Exception as exc:
+        _sync_failed(db, inv, "解析失败: {}".format(exc))
+    added, updated = host_import.upsert_hosts(db, inv_id, rows)
+    inv.sync_status = "ok"
+    inv.sync_message = "新增 {} 台,更新 {} 台".format(added, updated)
+    inv.last_sync_at = datetime.utcnow()
+    db.commit()
+    return HostImportResult(added=added, updated=updated, errors=errors)
+
+
+def _sync_failed(db: Session, inv: Inventory, message: str):
+    inv.sync_status = "error"
+    inv.sync_message = message
+    inv.last_sync_at = datetime.utcnow()
+    db.commit()
+    raise HTTPException(status_code=502, detail=message)
+
+
+def _parse_sync_body(body: bytes, content_type: str):
+    """按 Content-Type 或内容首字符判断 JSON([ 开头)还是 CSV。"""
+    text = host_import.decode_csv_bytes(body)
+    stripped = text.lstrip()
+    if "json" in content_type.lower() or stripped.startswith("["):
+        data = json.loads(stripped)
+        if not isinstance(data, list):
+            raise ValueError("JSON 内容不是数组")
+        rows = []
+        errors = []
+        for i, item in enumerate(data):
+            if not isinstance(item, dict):
+                errors.append("第{}项: 不是对象".format(i + 1))
+                continue
+            hostname = str(item.get("hostname") or "").strip()
+            if not hostname:
+                errors.append("第{}项: 主机名为空".format(i + 1))
+                continue
+            rows.append(
+                {
+                    "hostname": hostname,
+                    "port": host_import._parse_port(item.get("port", 22)),
+                    "group_name": str(item.get("group_name") or ""),
+                    "vars": str(item.get("vars") or ""),
+                    "comment": str(item.get("comment") or ""),
+                }
+            )
+        return rows, errors
+    return host_import.parse_csv(text)
