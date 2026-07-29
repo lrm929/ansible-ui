@@ -8,7 +8,8 @@ __pycache__/
 
 # Node / 前端构建
 node_modules/
-frontend/dist/
+# 注意: frontend/dist 有意纳入 git 管理,服务器自动更新直接拉取即可运行。
+# 提交代码前务必先执行 cd frontend && npm run build 保证 dist 最新。
 
 # 编辑器与系统
 .idea/
